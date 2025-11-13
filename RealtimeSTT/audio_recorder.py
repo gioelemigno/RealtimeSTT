@@ -279,6 +279,7 @@ class AudioToTextRecorder:
                  realtime_batch_size: int = 16,
 
                  # Voice activation parameters
+                 silero_load_func: callable = None,
                  silero_sensitivity: float = INIT_SILERO_SENSITIVITY,
                  silero_use_onnx: bool = False,
                  silero_deactivity_detection: bool = False,
@@ -365,12 +366,14 @@ class AudioToTextRecorder:
             threads
         - device (str, default="cuda"): Device for model to use. Can either be 
             "cuda" or "cpu".
+
         - on_recording_start (callable, default=None): Callback function to be
             called when recording of audio to be transcripted starts.
         - on_recording_stop (callable, default=None): Callback function to be
             called when recording of audio to be transcripted stops.
         - on_transcription_start (callable, default=None): Callback function
             to be called when transcription of audio to text starts.
+
         - ensure_sentence_starting_uppercase (bool, default=True): Ensures
             that every sentence detected by the algorithm starts with an
             uppercase letter.
@@ -397,6 +400,7 @@ class AudioToTextRecorder:
             Using separate models allows for a smaller, faster model for
             real-time transcription while keeping a more accurate model for
             final transcription.
+
         - realtime_model_type (str, default="tiny"): Specifies the machine
             learning model to be used for real-time transcription. Valid
             options include 'tiny', 'tiny.en', 'base', 'base.en', 'small',
@@ -418,6 +422,10 @@ class AudioToTextRecorder:
             slight delay compared to the regular real-time updates.
         - realtime_batch_size (int, default=16): Batch size for the real-time
             transcription model.
+
+        - silero_load_func: (callable, default=None): Function to use in place
+            of `torch.hub.load` to load the Silero VAD model from 
+            https://github.com/snakers4/silero-vad.
         - silero_sensitivity (float, default=SILERO_SENSITIVITY): Sensitivity
             for the Silero Voice Activity Detection model ranging from 0
             (least sensitive) to 1 (most sensitive). Default is 0.5.
@@ -646,6 +654,7 @@ class AudioToTextRecorder:
         self.silero_check_time = 0
         self.silero_working = False
         self.speech_end_silence_start = 0
+        self.silero_load_func = silero_load_func
         self.silero_sensitivity = silero_sensitivity
         self.silero_deactivity_detection = silero_deactivity_detection
         self.listen_start = 0
@@ -919,12 +928,17 @@ class AudioToTextRecorder:
 
         # Setup voice activity detection model Silero VAD
         try:
-            self.silero_vad_model, _ = torch.hub.load(
-                repo_or_dir="snakers4/silero-vad",
-                model="silero_vad",
-                verbose=False,
-                onnx=silero_use_onnx
-            )
+            if self.silero_load_func:
+                self.silero_vad_model, _ = self.silero_load_func(
+                    onnx=silero_use_onnx
+                )
+            else:
+                self.silero_vad_model, _ = torch.hub.load(
+                    repo_or_dir="snakers4/silero-vad",
+                    model="silero_vad",
+                    verbose=False,
+                    onnx=silero_use_onnx
+                )
 
         except Exception as e:
             logger.exception(f"Error initializing Silero VAD "
