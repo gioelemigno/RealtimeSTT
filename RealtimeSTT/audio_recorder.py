@@ -753,7 +753,10 @@ class AudioToTextRecorder:
         self.parent_stdout_pipe, child_stdout_pipe = SafePipe()
 
         # Set device for model
-        self.device = "cuda" if self.device == "cuda" and torch.cuda.is_available() else "cpu"
+        # self.device = "cuda" if self.device == "cuda" and torch.cuda.is_available() else "cpu"
+        if self.device == "cuda" and not torch.cuda.is_available():
+            logger.error("cuda device is not available! Please switch to `cpu`")
+            raise Exception("cuda device is not available! Please switch to `cpu`")
 
         self.transcript_process = self._start_thread(
             target=AudioToTextRecorder._transcription_worker,
