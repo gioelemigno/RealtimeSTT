@@ -94,11 +94,12 @@ if platform.system() != 'Darwin':
 class TranscriptionWorker:
     def __init__(self, conn, stdout_pipe, model_path, download_root, compute_type, gpu_device_index, device,
                  ready_event, shutdown_event, interrupt_stop_event, beam_size, initial_prompt, suppress_tokens,
-                 batch_size, faster_whisper_vad_filter, normalize_audio):
+                 batch_size, faster_whisper_vad_filter, normalize_audio, local_files_only):
         self.conn = conn
         self.stdout_pipe = stdout_pipe
         self.model_path = model_path
         self.download_root = download_root
+        self.local_files_only = local_files_only
         self.compute_type = compute_type
         self.gpu_device_index = gpu_device_index
         self.device = device
@@ -148,6 +149,7 @@ class TranscriptionWorker:
                 compute_type=self.compute_type,
                 device_index=self.gpu_device_index,
                 download_root=self.download_root,
+                local_files_only=self.local_files_only,
             )
             # Create a short dummy audio array, for example 1 second of silence at 16 kHz
             if self.batch_size > 0:
@@ -253,6 +255,7 @@ class AudioToTextRecorder:
     def __init__(self,
                  model: str = INIT_MODEL_TRANSCRIPTION,
                  download_root: str = None, 
+                 local_files_only: bool = False,
                  language: str = "",
                  compute_type: str = "default",
                  input_device_index: int = None,
@@ -351,6 +354,9 @@ class AudioToTextRecorder:
             from the Hugging Face Hub.
         - download_root (str, default=None): Specifies the root path were the Whisper models 
           are downloaded to. When empty, the default is used. 
+        - local_files_only (bool, default=False): During faster Whisper download, 
+            avoid downloading the file and return the path to the local 
+            cached file if it exists.
         - language (str, default=""): Language code for speech-to-text engine.
             If not specified, the model will attempt to detect the language
             automatically.
@@ -625,6 +631,7 @@ class AudioToTextRecorder:
         if not download_root:
             download_root = None
         self.download_root = download_root
+        self.local_files_only = local_files_only
         self.realtime_model_type = realtime_model_type
         self.realtime_processing_pause = realtime_processing_pause
         self.init_realtime_after_seconds = init_realtime_after_seconds
@@ -767,6 +774,7 @@ class AudioToTextRecorder:
                 self.batch_size,
                 self.faster_whisper_vad_filter,
                 self.normalize_audio,
+                self.local_files_only
             )
         )
 
@@ -806,6 +814,7 @@ class AudioToTextRecorder:
                     compute_type=self.compute_type,
                     device_index=self.gpu_device_index,
                     download_root=self.download_root,
+                    local_files_only=self.local_files_only,
                 )
                 if self.realtime_batch_size > 0:
                     self.realtime_model_type = BatchedInferencePipeline(model=self.realtime_model_type)
